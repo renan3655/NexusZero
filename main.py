@@ -169,7 +169,7 @@ if __name__ == "__main__":
                             
                             minutos, tempo_formatado = AnalisadorJogos.processar_tempo(partida.get('timePeriod'))
                             
-                            if placar_casa == 0 and placar_fora == 0 and minutos >= MIN_MINUTES:
+                            if placar_casa == 0 and placar_fora == 0 and 20 <= minutos <= 40:
                                 jogo = {
                                     'Competição': partida['trackingEvents'][0]['typedServerParameter']['competition']['value'],
                                     'Time Casa': time_casa,
