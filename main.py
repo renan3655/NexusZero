@@ -2,7 +2,7 @@
 """
 ANÁLISE DE JOGOS 0x0 EM TEMPO REAL - v2.2
 Desenvolvido por: Renan Quintanilha Marques 
-Última atualização: 05/04/2025  
+Última atualização: 06/04/2025  
 """
 
 import json
@@ -14,6 +14,7 @@ from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
 import sys
 from telegram_notifier import enviar_notificacao  # Importação da nova função
+import time  # Para controle de intervalo de tempo
 
 # ====================== CONFIGURAÇÕES ======================
 HEADER_COLOR = "2A629A"  # Azul mais moderno
@@ -21,6 +22,9 @@ FILE_NAME = "Relatorio_Jogos_0x0.xlsx"
 MIN_MINUTES = 20  # Tempo mínimo para análise
 MAX_MINUTES = 120  # Tempo máximo considerado
 SHOW_LIMIT = 10  # Quantidade de jogos exibidos no console
+
+# Variável global para jogos já notificados
+jogos_notificados = set()
 
 # ====================== FUNÇÕES PRINCIPAIS ======================
 class AnalisadorJogos:
@@ -148,72 +152,79 @@ class AnalisadorJogos:
 # ====================== EXECUÇÃO ======================
 if __name__ == "__main__":
     try:
-        print(f"\n⚽ ANALISADOR DE JOGOS 0x0 (≥{MIN_MINUTES} minutos) ⚽\n")
+        print(f"\n⚽ NEXUS ZERO - Desenvolvido por Renan Quintanilha Marques\n")
         
-        # Coleta de dados
-        if not (dados := AnalisadorJogos.obter_dados()):
-            sys.exit(1)
+        # Loop contínuo para execução automática a cada 15 minutos
+        while True:
+            print("\n🔄 Iniciando nova análise...\n")
             
-        # Processamento
-        jogos_validos = []
-        for jogo in dados.get('props', {}).get('pageProps', {}).get('containers', []):
-            try:
-                if cards := jogo.get('type', {}).get('fullWidth', {}).get('component', {}).get('contentType', {}).get('matchCardsList', {}):
-                    for partida in cards.get('matchCards', []):
-                        try:
-                            # Extração segura
-                            time_casa = partida['homeTeam']['name']
-                            placar_casa = int(partida['homeTeam']['score'].split()[0]) if partida['homeTeam']['score'] else 0
-                            time_fora = partida['awayTeam']['name']
-                            placar_fora = int(partida['awayTeam']['score'].split()[0]) if partida['awayTeam']['score'] else 0
-                            
-                            minutos, tempo_formatado = AnalisadorJogos.processar_tempo(partida.get('timePeriod'))
-                            
-                            if placar_casa == 0 and placar_fora == 0 and 20 <= minutos <= 40:
-                                jogo = {
-                                    'Competição': partida['trackingEvents'][0]['typedServerParameter']['competition']['value'],
-                                    'Time Casa': time_casa,
-                                    'Placar Casa': placar_casa,
-                                    'Time Visitante': time_fora,
-                                    'Placar Visitante': placar_fora,
-                                    'Tempo Jogo': tempo_formatado,
-                                    'Minutos': minutos,
-                                    'Status': 'Em Andamento' if minutos > 0 else 'Pré-Jogo',
-                                    'Data': datetime.now().strftime('%d/%m/%Y'),
-                                    'Hora': datetime.now().strftime('%H:%M:%S')
-                                }
-                                jogos_validos.append(jogo)
+            # Coleta de dados
+            dados = AnalisadorJogos.obter_dados()
+            if not dados:
+                print("⚠️ Dados não obtidos, tentando novamente na próxima execução...")
+                dados = {"props": {"pageProps": {"containers": []}}}  # Dados vazios para evitar falhas
+            
+            # Processamento
+            jogos_validos = []
+            for jogo in dados.get('props', {}).get('pageProps', {}).get('containers', []):
+                try:
+                    if cards := jogo.get('type', {}).get('fullWidth', {}).get('component', {}).get('contentType', {}).get('matchCardsList', {}):
+                        for partida in cards.get('matchCards', []):
+                            try:
+                                # Extração segura
+                                time_casa = partida['homeTeam']['name']
+                                placar_casa = int(partida['homeTeam']['score'].split()[0]) if partida['homeTeam']['score'] else 0
+                                time_fora = partida['awayTeam']['name']
+                                placar_fora = int(partida['awayTeam']['score'].split()[0]) if partida['awayTeam']['score'] else 0
                                 
-                                # ENVIA NOTIFICAÇÃO PARA O TELEGRAM
-                                try:
-                                    enviar_notificacao(
-                                        time_casa=jogo['Time Casa'],
-                                        time_fora=jogo['Time Visitante'],
-                                        competicao=jogo['Competição'],
-                                        tempo=jogo['Tempo Jogo']
-                                    )
-                                except Exception as e:
-                                    print(f"⚠️ Falha no Telegram: {e}")
+                                minutos, tempo_formatado = AnalisadorJogos.processar_tempo(partida.get('timePeriod'))
+                                
+                                if placar_casa == 0 and placar_fora == 0 and 20 <= minutos <= 40:
+                                    jogo = {
+                                        'Competição': partida['trackingEvents'][0]['typedServerParameter']['competition']['value'],
+                                        'Time Casa': time_casa,
+                                        'Placar Casa': placar_casa,
+                                        'Time Visitante': time_fora,
+                                        'Placar Visitante': placar_fora,
+                                        'Tempo Jogo': tempo_formatado,
+                                        'Minutos': minutos,
+                                        'Status': 'Em Andamento' if minutos > 0 else 'Pré-Jogo',
+                                        'Data': datetime.now().strftime('%d/%m/%Y'),
+                                        'Hora': datetime.now().strftime('%H:%M:%S')
+                                    }
+                                    jogos_validos.append(jogo)
                                     
-                        except Exception:
-                            continue
-            except Exception:
-                continue
-        
-        # Resultados
-        print(f"\n📋 Total de jogos válidos: {len(jogos_validos)}")
-        for i, jogo in enumerate(jogos_validos[:SHOW_LIMIT], 1):
-            print(f"{i}. {jogo['Time Casa']} {jogo['Placar Casa']}×{jogo['Placar Visitante']} {jogo['Time Visitante']} | {jogo['Tempo Jogo']}")
-        
-        # Relatório
-        if not AnalisadorJogos.gerar_relatorio(jogos_validos):
-            sys.exit(1)
+                                    # ENVIA NOTIFICAÇÃO PARA O TELEGRAM
+                                    if jogo['Time Casa'] + jogo['Time Visitante'] not in jogos_notificados:
+                                        try:
+                                            enviar_notificacao(
+                                                time_casa=jogo['Time Casa'],
+                                                time_fora=jogo['Time Visitante'],
+                                                competicao=jogo['Competição'],
+                                                tempo=jogo['Tempo Jogo']
+                                            )
+                                            # Marque o jogo como notificado
+                                            jogos_notificados.add(jogo['Time Casa'] + jogo['Time Visitante'])
+                                        except Exception as e:
+                                            print(f"⚠️ Falha no Telegram: {e}")
+                            except Exception:
+                                continue
+                except Exception:
+                    continue
             
-        print("\n🎉 Análise concluída com sucesso!")
+            # Resultados
+            print(f"\n📋 Total de jogos válidos: {len(jogos_validos)}")
+            for i, jogo in enumerate(jogos_validos[:SHOW_LIMIT], 1):
+                print(f"{i}. {jogo['Time Casa']} {jogo['Placar Casa']}×{jogo['Placar Visitante']} {jogo['Time Visitante']} | {jogo['Tempo Jogo']}")
+            
+            # Relatório
+            AnalisadorJogos.gerar_relatorio(jogos_validos)
+            
+            print("\n⏳ Aguardando próxima execução (15 minutos)... Pressione CRTRl + C p/sair\n")
+            time.sleep(900)  # Espera por 15 minutos antes de reiniciar o loop
         
     except KeyboardInterrupt:
-        print("\n⏹️ Processo interrompido pelo usuário")
-        sys.exit(0)
+        print("\n⏹️ Monitoramento interrompido pelo usuário")
     except Exception as e:
         print(f"\n❌ ERRO: {type(e).__name__} - {str(e)}")
         sys.exit(1)
