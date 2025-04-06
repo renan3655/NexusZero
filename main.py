@@ -8,7 +8,7 @@ Desenvolvido por: Renan Quintanilha Marques
 import json
 import re
 from httpx import get, RequestError
-from datetime import datetime
+from datetime import datetime, timedelta
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
@@ -216,15 +216,21 @@ if __name__ == "__main__":
             print(f"\n📋 Total de jogos válidos: {len(jogos_validos)}")
             for i, jogo in enumerate(jogos_validos[:SHOW_LIMIT], 1):
                 print(f"{i}. {jogo['Time Casa']} {jogo['Placar Casa']}×{jogo['Placar Visitante']} {jogo['Time Visitante']} | {jogo['Tempo Jogo']}")
+                
             
-            # Relatório
+                        # Relatório
             AnalisadorJogos.gerar_relatorio(jogos_validos)
             
-            print("\n⏳ Aguardando próxima execução (15 minutos)... Pressione CRTRl + C p/sair\n")
-            time.sleep(900)  # Espera por 15 minutos antes de reiniciar o loop
+            # Calcula o horário da próxima execução
+            hora_atual = datetime.now()
+            proxima_execucao = hora_atual + timedelta(minutes=15)
+            print(f"\n⏳ Aguardando próxima execução às {proxima_execucao.strftime('%H:%M:%S')}... Pressione Ctrl+C para sair\n")
+            
+            # Aguarda 15 minutos antes de continuar o loop
+            time.sleep(900)  # 15 minutos em segundos
         
     except KeyboardInterrupt:
         print("\n⏹️ Monitoramento interrompido pelo usuário")
     except Exception as e:
         print(f"\n❌ ERRO: {type(e).__name__} - {str(e)}")
-        sys.exit(1)
+
