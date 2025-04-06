@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-ANÁLISE DE JOGOS 0x0 EM TEMPO REAL - v2.1
-Desenvolvido por: [Seu Nome]
-Última atualização: [Data]
+ANÁLISE DE JOGOS 0x0 EM TEMPO REAL - v2.2
+Desenvolvido por: Renan Quintanilha Marques 
+Última atualização: 05/04/2025  
 """
 
 import json
@@ -13,13 +13,14 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
 import sys
+from telegram_notifier import enviar_notificacao  # Importação da nova função
 
 # ====================== CONFIGURAÇÕES ======================
 HEADER_COLOR = "2A629A"  # Azul mais moderno
 FILE_NAME = "Relatorio_Jogos_0x0.xlsx"
 MIN_MINUTES = 20  # Tempo mínimo para análise
 MAX_MINUTES = 120  # Tempo máximo considerado
-SHOW_LIMIT = 5  # Quantidade de jogos exibidos no console
+SHOW_LIMIT = 10  # Quantidade de jogos exibidos no console
 
 # ====================== FUNÇÕES PRINCIPAIS ======================
 class AnalisadorJogos:
@@ -169,7 +170,7 @@ if __name__ == "__main__":
                             minutos, tempo_formatado = AnalisadorJogos.processar_tempo(partida.get('timePeriod'))
                             
                             if placar_casa == 0 and placar_fora == 0 and minutos >= MIN_MINUTES:
-                                jogos_validos.append({
+                                jogo = {
                                     'Competição': partida['trackingEvents'][0]['typedServerParameter']['competition']['value'],
                                     'Time Casa': time_casa,
                                     'Placar Casa': placar_casa,
@@ -180,7 +181,20 @@ if __name__ == "__main__":
                                     'Status': 'Em Andamento' if minutos > 0 else 'Pré-Jogo',
                                     'Data': datetime.now().strftime('%d/%m/%Y'),
                                     'Hora': datetime.now().strftime('%H:%M:%S')
-                                })
+                                }
+                                jogos_validos.append(jogo)
+                                
+                                # ENVIA NOTIFICAÇÃO PARA O TELEGRAM
+                                try:
+                                    enviar_notificacao(
+                                        time_casa=jogo['Time Casa'],
+                                        time_fora=jogo['Time Visitante'],
+                                        competicao=jogo['Competição'],
+                                        tempo=jogo['Tempo Jogo']
+                                    )
+                                except Exception as e:
+                                    print(f"⚠️ Falha no Telegram: {e}")
+                                    
                         except Exception:
                             continue
             except Exception:
